@@ -1,26 +1,33 @@
-# Twin Coach Deal Configurator Blueprint
+
+# Blueprint: Twin Coach Financial Model
 
 ## Overview
 
-This document outlines the structure, features, and development plan for the Twin Coach Deal Configurator application. The project migrates a sophisticated, spreadsheet-based financial model (`v33+`) into a modern, interactive React web application. The core purpose of the model is to analyze the financial feasibility of a community ownership housing project, balancing the interests of the seller, investors, a housing cooperative (co-op), and a community land trust (CLT).
+This application serves as an interactive financial modeling and visualization tool for the "Twin Coach" community ownership model. It is designed to provide a transparent and detailed comparison against conventional real estate transactions and to break down the financial outcomes for all key stakeholders: the Seller, the Housing Cooperative (Co-op), the Investors, and the Community Land Trust (CLT).
 
-The application will allow users to adjust various financial parameters and instantly see the impact on all stakeholders, providing clear visualizations of rents, tax benefits, and long-term affordability.
+## Implemented Features (v2)
 
-## Implemented Features
+This version represents a major overhaul of the application, focusing on improved user experience, architectural robustness, and financial transparency.
 
-*   **Project Setup:** Initialized a React project using Vite.
-*   **Core Logic Ported:** Migrated the core financial calculations from the spreadsheet model to JavaScript.
-*   **Basic UI and State Management:** Built the initial user interface with React, allowing users to adjust parameters and see the results.
-*   **UI Refinement and Interactivity:** Enhanced the application's design with a modern and professional look and feel, including improved layouts, icons, and interactive elements.
-*   **Rent Scenarios:** Implemented buttons to quickly switch between pre-defined rent scenarios (Low, Medium, High).
-*   **Day 1 Solvency Warning:** Added a critical warning that appears if the deal structure is not financially viable from the start for the seller or investors.
-*   **Expanded Parameter Controls:** Added sliders to control key financial parameters, including Fair Market Value, Investor Down Payment, Co-op Buyout Rate, and Seller Loan Amortization.
-*   **Data Visualizations:** Integrated charts to visualize key data, including a rent comparison chart and a loan amortization chart.
-*   **Project Blueprint:** Created and maintained this `blueprint.md` to track project scope and progress.
+### Architecture & Navigation
+*   **Multi-Page Structure:** The application was refactored from a single-page app into a multi-page structure using `react-router-dom` for clear and scalable navigation.
+*   **Central Landing Page:** A new, aesthetically pleasing landing page (`src/pages/Home.jsx`) was created to serve as the central hub, directing users to the main sections of the application.
+*   **Dedicated Page Components:** The "Stakeholder Dashboard" and "Sale Comparison" views were moved into their own dedicated page components (`src/pages/DashboardPage.jsx` and `src/pages/ComparisonPage.jsx`).
+*   **Persistent Navigation:** A `NavBar` component (`src/components/NavBar.jsx`) provides consistent navigation across all pages.
 
-## Current Plan
+### Financial Modeling & Transparency
+*   **Upgraded Calculation Engine:** The core financial logic in `src/utils/flywheelCalculator.js` was replaced with a complete, CPA-audited calculation engine, ensuring accuracy and reliability.
+*   **Before & After Tax Values:** The `StakeholderCard` component was enhanced to display both **Gross (before-tax)** and **Net (after-tax)** financial figures, offering users a more transparent and comprehensive understanding of the financial outcomes.
+*   **Dynamic Dashboard:** The Stakeholder Dashboard is now powered by the full, correct set of parameters, feeding the accurate `flywheelCalculator` function to generate its data.
 
-### Step 1: Final Polish & Deployment
+### User Experience & Aesthetics
+*   **Modern Design:** The UI was updated with modern design principles, including the use of cards, iconography from `react-icons`, and a clean, visually balanced layout.
+*   **Intuitive Flow:** The new structure guides the user from a high-level overview on the landing page to the detailed financial dashboards, creating a more intuitive and understandable user journey.
 
-1.  **Review and Refine:** Conduct a final review of the application for any bugs or UI inconsistencies.
-2.  **Deploy to Firebase:** Use Project IDX's built-in Firebase integration to deploy the application and get a shareable URL.
+## Current Request: Commit & Rebuild
+
+The following steps will be taken to finalize the recent changes:
+1.  **Update Blueprint:** Document the architectural and feature changes in this `blueprint.md` file.
+2.  **Stage Changes:** Add all new and modified files to the git staging area.
+3.  **Commit Changes:** Commit the staged files with a descriptive message outlining the scope of the updates.
+4.  **Build Application:** Run the production build process to generate the optimized static assets for deployment.
