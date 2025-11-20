@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { FiSliders, FiRefreshCw, FiChevronDown, FiChevronUp } from 'react-icons/fi';
-import { DEFAULT_PARAMS } from '../utils/calculations';
+import { FiSliders, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 const DealParameters = ({ params, setParams }) => {
   const [openSection, setOpenSection] = useState('Core Deal');
@@ -8,8 +7,6 @@ const DealParameters = ({ params, setParams }) => {
   const handleValueChange = (name, value, isCheckbox = false, isNumeric = true) => {
     setParams(prev => ({ ...prev, [name]: isCheckbox ? value : (isNumeric ? parseFloat(value) : value) }));
   };
-
-  const resetParams = () => setParams(DEFAULT_PARAMS);
 
   const parameterGroups = [
     { name: 'Core Deal', fields: ['fairMarketValue', 'bargainSalePrice', 'investorDownPayment'] },
@@ -28,9 +25,6 @@ const DealParameters = ({ params, setParams }) => {
           <FiSliders className="h-6 w-6 text-brand-green-dark" />
           <h2 className="text-2xl font-bold text-brand-green-dark">Deal Parameters</h2>
         </div>
-        <button onClick={resetParams} className="p-2 rounded-full text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition">
-          <FiRefreshCw className="h-5 w-5" />
-        </button>
       </div>
 
       <div className="space-y-2">
