@@ -4,7 +4,7 @@
 TWIN COACH v33+ - COMPREHENSIVE CALCULATION ENGINE
 Community Ownership Model for Affordable Housing
 ================================================================================
-
+The following is deprecated but provided for reference, do not update or fix in this repository.
 VERSION: 3.3+ (Year 7 Strategic Buyout)
 DATE: November 8, 2025
 STATUS: Production Ready, CPA Audit-Approved
