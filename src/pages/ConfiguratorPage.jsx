@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { calculateModel, solveRent } from '../utils/engineV41';
+import { calculateModel, calculateRequiredRent } from '../utils/engineV41';
 import { ParameterGroup, InputField, Toggle } from '../components/ParameterGroup';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip as ChartTooltip, Legend } from 'chart.js';
@@ -9,7 +9,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, ChartTooltip, Le
 
 const INITIAL_STATE = {
   // CONFIG
-  investorExitYear: 7, // NEW: Flexible Exit
+  investorExitYear: 7,
 
   numUnits: 25,
   fairMarketValue: 2300000,
@@ -23,14 +23,14 @@ const INITIAL_STATE = {
 
   opexInflationRate: 0.03,
   rentInflationEnabled: false,
-  trueCostReservePct: 0.10,
+  trueCostReservePct: 0.05, // Default 5% Margin
 
   bargainSalePrice: 1550000,
   investorDownPayment: 310000,
   sellerLoanRate: 0.085,
-  sellerLoanAmortization: 30, // NEW: Flexible Term
+  sellerLoanAmortization: 30,
 
-  monthlyRent: 700,
+  monthlyRent: 700, // Will be auto-calculated on load
   vacancyRate: 0.05,
   propTax: 28344,
   insurance: 9000,
@@ -63,20 +63,30 @@ const INITIAL_STATE = {
 export default function ConfiguratorPage() {
   const [params, setParams] = useState(INITIAL_STATE);
   const [results, setResults] = useState(null);
-  const [openGroups, setOpenGroups] = useState({ deal: true, ops: true, tax: true });
+  const [openGroups, setOpenGroups] = useState({ deal: true, ops: true, tax: false });
+
+  // Auto-calculate rent whenever relevant params change
+  useEffect(() => {
+    const newRent = calculateRequiredRent(params, params.trueCostReservePct);
+    if (newRent !== params.monthlyRent) {
+        setParams(prev => ({ ...prev, monthlyRent: newRent }));
+    }
+  }, [
+      params.trueCostReservePct,
+      params.propTax, params.insurance, params.mgmtFee, params.groundLease, params.coopMaint,
+      params.sellerLoanRate, params.sellerLoanAmortization, params.bargainSalePrice, params.investorDownPayment,
+      params.numUnits, params.vacancyRate
+  ]);
 
   useEffect(() => { setResults(calculateModel(params)); }, [params]);
 
   const updateParam = (key, value) => setParams(prev => ({ ...prev, [key]: value }));
-  const applyRentScenario = (mode) => updateParam('monthlyRent', solveRent(mode, params));
-  const setPresetRent = (amount) => updateParam('monthlyRent', amount);
   const toggleGroup = (key) => setOpenGroups(prev => ({...prev, [key]: !prev[key]}));
 
-  if (!results) return <div>Loading...</div>;
+  if (!results) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-slate-400">Loading Engine...</div>;
 
   const totalCapex = params.capex_5yr + params.capex_7yr + params.capex_15yr + params.capex_27yr;
 
-  // Dynamic Chart Labels based on Exit Year
   const labels = ['Start'];
   for(let i=1; i<params.investorExitYear; i++) labels.push(`Y${i}`);
   labels.push(`Y${params.investorExitYear} (Exit)`);
@@ -86,16 +96,40 @@ export default function ConfiguratorPage() {
     datasets: [{
       label: 'Inv. Cash Flow',
       data: results.investor.cashFlows,
-      backgroundColor: results.investor.cashFlows.map(v => v >= 0 ? '#10b981' : '#ef4444'),
-      borderRadius: 4
+      backgroundColor: results.investor.cashFlows.map(v => v >= 0 ? '#10b981' : '#f43f5e'),
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: results.investor.cashFlows.map(v => v >= 0 ? '#059669' : '#e11d48'),
     }]
   };
 
+  const chartOptions = {
+      responsive: true,
+      plugins: {
+          legend: {display:false},
+          title: {display: true, text: `Investor Cash Flow (${params.investorExitYear} Year Plan)`, color: '#cbd5e1'},
+          tooltip: {
+              backgroundColor: '#1e293b',
+              titleColor: '#f8fafc',
+              bodyColor: '#cbd5e1',
+              borderColor: '#334155',
+              borderWidth: 1
+          }
+      },
+      scales: {
+          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+      }
+  };
+
+  const rentBand = results.coop.rentBand;
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col lg:flex-row">
-      <aside className="w-full lg:w-[450px] bg-white border-r border-slate-200 h-screen overflow-y-auto p-6 shadow-xl z-10 sticky top-0">
-        <h1 className="text-2xl font-bold text-blue-900 mb-2">Twin Coach v41</h1>
-        <p className="text-xs text-slate-500 mb-6">Flexible Terms & Dynamic ROI</p>
+    <div className="min-h-screen bg-slate-900 font-sans text-slate-100 flex flex-col lg:flex-row">
+      {/* SIDEBAR */}
+      <aside className="w-full lg:w-[420px] bg-slate-800/50 border-r border-slate-700 h-screen overflow-y-auto p-6 shadow-2xl z-10 sticky top-0 scrollbar-thin scrollbar-thumb-slate-700">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-emerald-400 bg-clip-text text-transparent mb-1">Twin Coach v41</h1>
+        <p className="text-xs text-slate-400 mb-8 font-medium tracking-wide">FLEXIBLE TIMELINES & DYNAMIC ROI</p>
 
         <ParameterGroup title="1. Timelines & Deal" isOpen={openGroups.deal} onToggle={() => toggleGroup('deal')}>
           <div className="grid grid-cols-2 gap-4">
@@ -117,33 +151,45 @@ export default function ConfiguratorPage() {
                 tooltip="Length used to calc payments. Longer = Lower Pay/Higher Balloon."
             />
           </div>
-          <InputField label="Down Payment" id="investorDownPayment" value={params.investorDownPayment} onChange={updateParam} prefix="$" />
+          <InputField label="Down Payment" id="investorDownPayment" value={params.investorDownPayment} onChange={updateParam} prefix="$" step={5000} />
           <InputField label="Total CAPEX" id="dummy" value={totalCapex} readOnly prefix="$" />
         </ParameterGroup>
 
-        <ParameterGroup title="2. Rent & Inflation" isOpen={openGroups.ops} onToggle={() => toggleGroup('ops')}>
-            <InputField label="Monthly Rent" id="monthlyRent" value={params.monthlyRent} onChange={updateParam} prefix="$" />
+        <ParameterGroup title="2. Rent & Margin" isOpen={openGroups.ops} onToggle={() => toggleGroup('ops')}>
+             <div className="mb-6 p-4 bg-slate-900/50 rounded-xl border border-slate-700/50">
+                <div className="flex justify-between items-end mb-2">
+                    <span className="text-xs font-bold text-slate-400 uppercase">Calculated Rent</span>
+                    <span className="text-2xl font-bold text-white">${params.monthlyRent}</span>
+                </div>
 
-            {/* RENT SCENARIOS */}
-            <div className="grid grid-cols-2 gap-2 my-3">
-                 <button onClick={() => setPresetRent(700)} className="py-2 px-3 bg-white border border-slate-200 hover:border-blue-500 hover:bg-blue-50 rounded text-xs text-slate-700 font-medium transition-colors">
-                    Tenant First ($700)
-                 </button>
-                 <button onClick={() => setPresetRent(800)} className="py-2 px-3 bg-white border border-slate-200 hover:border-blue-500 hover:bg-blue-50 rounded text-xs text-slate-700 font-medium transition-colors">
-                    Seller Focus ($800)
-                 </button>
+                {/* Rent Band Indicator */}
+                <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden mb-2">
+                    <div
+                        className={`h-full transition-all duration-500 bg-${rentBand.color}-500`}
+                        style={{ width: `${rentBand.score}%` }}
+                    ></div>
+                </div>
+                <div className={`text-right text-xs font-bold text-${rentBand.color}-400`}>
+                    {rentBand.label}
+                </div>
             </div>
 
-            <div className="p-3 bg-blue-50 rounded border border-blue-100 mb-3">
-                <button onClick={() => applyRentScenario('true_cost')} className="w-full py-1.5 bg-white border border-blue-300 text-blue-700 text-xs font-bold rounded shadow-sm hover:bg-blue-100">
-                    Calculated Rent (Cost + Reserve)
-                </button>
-            </div>
+            <InputField
+                label="Safety Margin (Reserve)"
+                id="trueCostReservePct"
+                value={params.trueCostReservePct}
+                onChange={updateParam}
+                step={0.01}
+                min={0} max={0.25}
+                suffix="%"
+                tooltip="Buffer added on top of OpEx + Debt to ensure safety. Increases Rent."
+            />
+
             <InputField label="OpEx Inflation" id="opexInflationRate" value={params.opexInflationRate} onChange={updateParam} step={0.005} suffix="%" />
         </ParameterGroup>
 
         <ParameterGroup title="3. Tax Strategy" isOpen={openGroups.tax} onToggle={() => toggleGroup('tax')}>
-            <div className="mb-4 p-3 bg-slate-100 rounded text-xs text-slate-600">
+            <div className="mb-4 p-3 bg-slate-700/30 rounded border border-slate-700 text-xs text-slate-400">
                 Default: Yellow Springs, OH (1.5% Local Tax).
             </div>
             <Toggle
@@ -159,42 +205,51 @@ export default function ConfiguratorPage() {
             <InputField label="Seller Recapture Rate" id="sellerRecaptureRate" value={params.sellerRecaptureRate} onChange={updateParam} step={0.01} />
         </ParameterGroup>
 
-        <div className="p-4 border-t border-slate-200 bg-slate-50 mt-8">
-            <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Co-op Exit Stress Test</h4>
-            <div className="mt-2 text-xs space-y-2">
-                <div className="flex justify-between"><span>Buyout Date:</span> <span className="font-bold">Year {params.investorExitYear}</span></div>
-                <div className="flex justify-between"><span>Buyout Price:</span> <span className="font-bold">${Math.round(results.coop.buyoutPrice).toLocaleString()}</span></div>
-                <div className="flex justify-between pt-2 border-t"><span>New Mortgage:</span> <span className="font-bold">${Math.round(results.coop.refiMonthly).toLocaleString()}/mo</span></div>
-                <div className={results.coop.isRefiViable ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+        <div className="p-6 border-t border-slate-700/50 bg-slate-800/30 mt-auto">
+            <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Co-op Exit Stress Test</h4>
+            <div className="mt-2 text-xs space-y-3">
+                <div className="flex justify-between text-slate-300"><span>Buyout Date:</span> <span className="font-bold text-white">Year {params.investorExitYear}</span></div>
+                <div className="flex justify-between text-slate-300"><span>Buyout Price:</span> <span className="font-bold text-white">${Math.round(results.coop.buyoutPrice).toLocaleString()}</span></div>
+                <div className="flex justify-between pt-3 border-t border-slate-700/50 text-slate-300"><span>New Mortgage:</span> <span className="font-bold text-white">${Math.round(results.coop.refiMonthly).toLocaleString()}/mo</span></div>
+                <div className={`text-center py-2 rounded font-bold ${results.coop.isRefiViable ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
                     {results.coop.isRefiViable ? "Viable (Cheaper than Rent)" : "Risk: Higher than Rent"}
                 </div>
             </div>
         </div>
-
       </aside>
 
-      <main className="flex-1 p-8 overflow-y-auto">
-        {results.warnings.map((w, i) => <div key={i} className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 text-red-700 font-bold text-sm">⚠️ {w.msg}</div>)}
+      {/* MAIN CONTENT */}
+      <main className="flex-1 p-8 lg:p-12 overflow-y-auto bg-slate-900">
+        {results.warnings.map((w, i) => (
+            <div key={i} className="mb-6 bg-rose-500/10 border-l-4 border-rose-500 p-4 text-rose-400 font-bold text-sm shadow-lg backdrop-blur-sm rounded-r-lg">
+                ⚠️ {w.msg}
+            </div>
+        ))}
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
             <MetricCard title="Seller Day 1" value={Math.round(results.seller.day1Net)} isCurrency />
-            <MetricCard title="Seller Advantage" value={Math.round(results.seller.advantage)} isCurrency color={results.seller.advantage > 0 ? "text-green-600" : "text-red-600"} />
-            <MetricCard title="Inv. IRR (After-Tax)" value={(results.investor.irr * 100).toFixed(2)} suffix="%" color="text-green-600" />
+            <MetricCard title="Seller Advantage" value={Math.round(results.seller.advantage)} isCurrency color={results.seller.advantage > 0 ? "text-emerald-400" : "text-rose-400"} />
+            <MetricCard title="Inv. IRR (After-Tax)" value={(results.investor.irr * 100).toFixed(2)} suffix="%" color="text-emerald-400" />
             <MetricCard title="Inv. Net Profit" value={Math.round(results.investor.netProfit)} isCurrency />
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8">
-            <Bar data={chartData} options={{ responsive: true, plugins: { legend: {display:false}, title: {display: true, text: `Investor Cash Flow (${params.investorExitYear} Year Plan)`} } }} />
+        <div className="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl mb-8">
+            <Bar data={chartData} options={chartOptions} />
+        </div>
+
+        {/* Helper Note */}
+        <div className="text-center text-slate-600 text-xs max-w-2xl mx-auto">
+            <p>Rent is automatically calculated based on Property Taxes, Insurance, Maint, Debt Service, and your selected Safety Margin.</p>
         </div>
       </main>
     </div>
   );
 }
 
-const MetricCard = ({ title, value, isCurrency, suffix, color="text-slate-900" }) => (
-    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <h3 className="text-xs font-bold text-slate-400 uppercase">{title}</h3>
-        <div className={`text-2xl font-bold mt-1 ${color}`}>
+const MetricCard = ({ title, value, isCurrency, suffix, color="text-white" }) => (
+    <div className="bg-slate-800 p-5 rounded-2xl shadow-lg border border-slate-700 hover:border-slate-600 transition-colors group">
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide group-hover:text-slate-400 transition-colors">{title}</h3>
+        <div className={`text-3xl font-bold mt-2 ${color} tracking-tight`}>
             {isCurrency ? '$' : ''}{value.toLocaleString()}{suffix}
         </div>
     </div>
