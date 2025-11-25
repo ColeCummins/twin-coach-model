@@ -69,6 +69,7 @@ export default function ConfiguratorPage() {
 
   const updateParam = (key, value) => setParams(prev => ({ ...prev, [key]: value }));
   const applyRentScenario = (mode) => updateParam('monthlyRent', solveRent(mode, params));
+  const setPresetRent = (amount) => updateParam('monthlyRent', amount);
   const toggleGroup = (key) => setOpenGroups(prev => ({...prev, [key]: !prev[key]}));
 
   if (!results) return <div>Loading...</div>;
@@ -123,7 +124,17 @@ export default function ConfiguratorPage() {
         <ParameterGroup title="2. Rent & Inflation" isOpen={openGroups.ops} onToggle={() => toggleGroup('ops')}>
             <InputField label="Monthly Rent" id="monthlyRent" value={params.monthlyRent} onChange={updateParam} prefix="$" />
 
-            <div className="p-3 bg-blue-50 rounded border border-blue-100 my-3">
+            {/* RENT SCENARIOS */}
+            <div className="grid grid-cols-2 gap-2 my-3">
+                 <button onClick={() => setPresetRent(700)} className="py-2 px-3 bg-white border border-slate-200 hover:border-blue-500 hover:bg-blue-50 rounded text-xs text-slate-700 font-medium transition-colors">
+                    Tenant First ($700)
+                 </button>
+                 <button onClick={() => setPresetRent(800)} className="py-2 px-3 bg-white border border-slate-200 hover:border-blue-500 hover:bg-blue-50 rounded text-xs text-slate-700 font-medium transition-colors">
+                    Seller Focus ($800)
+                 </button>
+            </div>
+
+            <div className="p-3 bg-blue-50 rounded border border-blue-100 mb-3">
                 <button onClick={() => applyRentScenario('true_cost')} className="w-full py-1.5 bg-white border border-blue-300 text-blue-700 text-xs font-bold rounded shadow-sm hover:bg-blue-100">
                     Calculated Rent (Cost + Reserve)
                 </button>
@@ -167,9 +178,9 @@ export default function ConfiguratorPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <MetricCard title="Seller Day 1" value={Math.round(results.seller.day1Net)} isCurrency />
-            <MetricCard title="Inv. Tax ROI (Y1)" value={results.investor.roiYear1} suffix="%" color="text-green-600" />
-            <MetricCard title="Co-op Buyout" value={Math.round(results.coop.buyoutPrice)} isCurrency />
-            <MetricCard title="Net Profit" value={Math.round(results.investor.netProfit)} isCurrency />
+            <MetricCard title="Seller Advantage" value={Math.round(results.seller.advantage)} isCurrency color={results.seller.advantage > 0 ? "text-green-600" : "text-red-600"} />
+            <MetricCard title="Inv. IRR (After-Tax)" value={(results.investor.irr * 100).toFixed(2)} suffix="%" color="text-green-600" />
+            <MetricCard title="Inv. Net Profit" value={Math.round(results.investor.netProfit)} isCurrency />
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8">

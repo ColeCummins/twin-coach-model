@@ -5,6 +5,22 @@
 
 export const BONUS_SCHEDULE = { 2025: 0.40, 2026: 0.20, 2027: 0.00 };
 
+// --- HELPER: IRR CALCULATION ---
+const irr_calc = (cfs) => {
+    let irr = 0.1;
+    for(let i=0; i<100; i++) {
+        let npv = 0, dnpv = 0;
+        for(let t=0; t<cfs.length; t++) {
+            npv += cfs[t] / Math.pow(1+irr, t);
+            dnpv -= t * cfs[t] / Math.pow(1+irr, t+1);
+        }
+        if (Math.abs(npv) < 1e-6) return irr;
+        irr -= npv / dnpv;
+        if (isNaN(irr) || !isFinite(irr)) return 0;
+    }
+    return irr;
+};
+
 // --- 1. LOAN ENGINE ---
 export const LoanEngine = {
     pmt: (rate, nper, pv) => {
@@ -192,10 +208,18 @@ export const calculateModel = (params) => {
         cashFlows: invCashFlows,
         totalTaxSavings,
         netProfit: cumNetProfit, // Note: This is simple Sum of Flows, not NPV
-        roiYear1: Math.round((invCashFlows[1] / -(invCashFlows[0])) * 100) // Rough ROI metric
+        roiYear1: Math.round((invCashFlows[1] / -(invCashFlows[0])) * 100), // Rough ROI metric
+        irr: irr_calc(invCashFlows) // Precise IRR
     };
 
-    // 4. Seller Solvency
+    // 4. Seller Solvency & Comparison
+    // Reconstruct Seller "Conventional Sale" Baseline
+    const sellerAdjustedBasis = Math.max(0, params.sellerOriginalPurchasePrice - params.sellerOriginalLandValue - ((params.sellerOriginalPurchasePrice - params.sellerOriginalLandValue)/27.5 * params.sellerHoldingPeriod));
+    const convGain = params.fairMarketValue - sellerAdjustedBasis;
+    // CPA-Grade Logic: Gain = 15% Fed + 5% State Est + 10% Recapture Est
+    const convTax = (convGain * 0.15) + (convGain * 0.05) + (convGain * 0.25 * 0.4);
+    const convNet = params.fairMarketValue - (params.fairMarketValue * 0.06) - convTax;
+
     const sellerDepTaken = ((params.sellerOriginalPurchasePrice - params.sellerOriginalLandValue)/27.5) * params.sellerHoldingPeriod;
     const sellerRecapture = sellerDepTaken * params.sellerRecaptureRate;
     const day1Net = params.investorDownPayment - 20000 - sellerRecapture;
@@ -215,7 +239,13 @@ export const calculateModel = (params) => {
     });
     sellerTotal += finalNoteBal; // Balloon happens at end of loop
 
-    results.seller = { day1Net, totalCash: sellerTotal, finalBalance: finalNoteBal };
+    results.seller = {
+        day1Net,
+        totalCash: sellerTotal,
+        finalBalance: finalNoteBal,
+        convNet: convNet,
+        advantage: sellerTotal - convNet
+    };
 
     // 5. Co-op / CLT Exit
     const buyoutPrice = finalNoteBal - kicker;
