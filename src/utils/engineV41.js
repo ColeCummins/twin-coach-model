@@ -120,26 +120,40 @@ export const TaxEngine = {
     }
 };
 
-// --- 4. RENT SOLVER ---
-export const solveRent = (mode, params) => {
+// --- 4. RENT SOLVER & ANALYSIS ---
+export const calculateRequiredRent = (params, marginPct) => {
     const monthlyOpEx = (params.propTax + params.insurance + params.mgmtFee + params.groundLease + params.coopMaint) / 12;
     const noteAmt = params.bargainSalePrice - params.investorDownPayment;
-    // Solve uses the Current Amortization Setting
     const monthlyDebt = LoanEngine.pmt(params.sellerLoanRate/12, params.sellerLoanAmortization*12, noteAmt);
     const effectiveUnits = params.numUnits * (1 - params.vacancyRate);
-    const trueCost = monthlyOpEx + monthlyDebt;
 
-    if (mode === 'true_cost') {
-        const totalReq = trueCost * (1 + params.trueCostReservePct);
-        return Math.ceil(totalReq / effectiveUnits);
-    }
-    return params.monthlyRent;
+    const trueCost = monthlyOpEx + monthlyDebt;
+    const totalReq = trueCost * (1 + marginPct);
+
+    return Math.ceil(totalReq / effectiveUnits);
 };
+
+export const getRentBand = (rent) => {
+    // These thresholds could be dynamic based on local AMI, but hardcoded for now
+    if (rent < 700) return { label: 'Deeply Affordable', color: 'emerald', score: 100 };
+    if (rent < 850) return { label: 'Workforce Housing', color: 'blue', score: 75 };
+    if (rent < 1000) return { label: 'Market Rate', color: 'yellow', score: 50 };
+    return { label: 'Premium / Luxury', color: 'rose', score: 25 };
+};
+
 
 // --- MAIN ORCHESTRATOR ---
 export const calculateModel = (params) => {
     const results = { seller: {}, investor: {}, coop: {}, warnings: [] };
     const exitYear = params.investorExitYear;
+
+    // --- AUTO-CALCULATE RENT ---
+    // Instead of using params.monthlyRent directly as an input, we use the margin to drive it.
+    // However, to keep state clean, the UI usually updates params.monthlyRent.
+    // But if we want it to be *strictly* calculated:
+    // We will assume params.monthlyRent IS the calculated value passed in, OR we re-calculate it here if we want to enforce it.
+    // Ideally, the UI updates the rent based on the margin slider, so params.monthlyRent is already correct.
+    // Let's rely on params.monthlyRent being correct, but we'll export calculateRequiredRent for the UI to use.
 
     let bonusRate = params.useConservativeBonus ? (BONUS_SCHEDULE[params.placedInServiceYear] || 0) : 1.0;
     const landValue = params.fairMarketValue * params.landRatio;
@@ -257,6 +271,9 @@ export const calculateModel = (params) => {
         refiMonthly: refiPmt,
         isRefiViable: refiPmt < (annualRent / 12) // Compare against final year rent
     };
+
+    // Add Band Info
+    results.coop.rentBand = getRentBand(params.monthlyRent);
 
     return results;
 };
