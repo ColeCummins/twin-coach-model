@@ -16,6 +16,7 @@ const NavBar = () => {
               <NavItem to="/" icon={<FiHome />} label="Home" />
               <NavItem to="/dashboard" icon={<FiBarChart2 />} label="Dashboard" />
               <NavItem to="/comparison" icon={<FiDollarSign />} label="Comparison" />
+              <NavItem to="/v41" icon={<FiBarChart2 />} label="Configurator v41" />
             </div>
           </div>
         </div>
