@@ -28,6 +28,14 @@ const Home = () => {
           title="Sale Comparison"
           description="Analyze the after-tax financial advantage of the Twin Coach model versus a conventional sale."
         />
+        <div className="col-span-1 md:col-span-2">
+            <Card
+            to="/v41"
+            icon={<FiBarChart2 className="h-8 w-8 text-white" />}
+            title="Twin Coach Configurator v41"
+            description="The new Flexible Timelines & Dynamic ROI engine. Highly accurate tax and depreciation schedules."
+            />
+        </div>
       </div>
     </div>
   );

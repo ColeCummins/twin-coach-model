@@ -162,7 +162,11 @@ function calculateInvestorTaxBenefits(params, annualSellerPayment) {
 }
 
 export function flywheelCalculator(params) {
-  const downPayment = params.bargainSalePrice * params.investorDownPaymentPct;
+  // Prioritize absolute down payment if present (from UI), otherwise use percentage
+  const downPayment = params.investorDownPayment !== undefined
+    ? params.investorDownPayment
+    : params.bargainSalePrice * params.investorDownPaymentPct;
+
   const sellerNotePrincipal = params.bargainSalePrice - downPayment;
 
   const sellerAmort = calculateSellerAmortization(
@@ -188,8 +192,33 @@ export function flywheelCalculator(params) {
     sellerAmort.annualPayment
   );
 
+  // --- Warning Checks ---
+  const warnings = [];
+
+  // Day 1 Solvency Check
+  // We reuse day1Net from sellerAdvantage calculation (DownPayment - Day1Tax)
+  // and subtract closing costs to see the actual cash in hand.
+  // Note: We assume day1Net in sellerAdvantage is strictly (DownPayment - Taxes).
+  // sellerAdvantage.day1Net isn't returned explicitly, but we can infer or recalculate.
+  // Let's recalculate for clarity and safety.
+
+  const buildingGain = params.bargainSalePrice - (params.sellerOriginalPurchasePrice * 0.60);
+  const day1Tax = buildingGain * (params.federalCapGainsRate + params.stateIncomeTaxRate);
+  const closingCosts = params.bargainSaleClosingCosts || 0;
+  const sellerNetCashDay1 = downPayment - (day1Tax + closingCosts);
+
+  const minSellerCash = 20000; // Safety buffer
+
+  if (sellerNetCashDay1 < minSellerCash) {
+      warnings.push({
+          title: 'Day 1 Cash Insolvency Risk',
+          message: `CRITICAL: The Seller's Day 1 Net Cash ($${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(sellerNetCashDay1)}) is insufficient to cover taxes and closing costs with a safety buffer. Increase the Investor Down Payment.`
+      });
+  }
+
   return {
     params: params,
+    warnings: warnings,
     seller: {
       GrossNotePrincipal: sellerNotePrincipal,
       NetAnnualPayment: sellerAmort.annualPayment,
@@ -197,8 +226,8 @@ export function flywheelCalculator(params) {
       advantagePct: sellerAdvantage.advantagePct,
       GrossConventionalSale: sellerAdvantage.conventionalGross,
       NetConventionalSale: sellerAdvantage.conventionalNet,
-      GrossBargainSale: sellerAdvantage.bargainSaleTotal + sellerAdvantage.conventionalTax, // Approximate
-      NetBargainSale: sellerAdvantage.bargainSaleTotal
+      GrossBargainSale: (sellerAdvantage.bargainSaleTotal * params.sellerPartners) + sellerAdvantage.conventionalTax, // Approximate Total
+      NetBargainSale: sellerAdvantage.bargainSaleTotal * params.sellerPartners // Converted to Total
     },
     coop: {
       phase1MonthlyRent: phase1Rent,
